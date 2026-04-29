@@ -1,0 +1,49 @@
+name: Conflict Tracker Pipeline
+
+on:
+  schedule:
+    # Runs every 15 minutes
+    - cron: "*/15 * * * *"
+  # Also allow manual triggers from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download spaCy model
+        run: python -m spacy download en_core_web_sm
+
+      - name: Run pipeline
+        run: python -m pipeline.run_once
+        env:
+          SUPABASE_URL:   ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:   ${{ secrets.SUPABASE_KEY }}
+          HF_API_TOKEN:   ${{ secrets.HF_API_TOKEN }}
+          NEWSAPI_KEY:    ${{ secrets.NEWSAPI_KEY }}
+          OPENCAGE_KEY:   ${{ secrets.OPENCAGE_KEY }}
+          LOG_LEVEL:      INFO
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 7
